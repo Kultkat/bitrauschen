@@ -5,8 +5,9 @@
     <title>Bitrauschen – Map View</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Mapbox GL JS CSS -->
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.21.0/mapbox-gl.css" rel="stylesheet">
+    <!-- Mapbox GL JS CSS (CDN) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.12.0/mapbox-gl.css" rel="stylesheet">
+
     <style>
         html, body { margin: 0; padding: 0; height: 100%; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
@@ -15,11 +16,11 @@
 <body>
     <div id="map"></div>
 
-    <!-- Mapbox GL JS -->
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.21.0/mapbox-gl.js"></script>
+    <!-- Mapbox GL JS (CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.12.0/mapbox-gl.js"></script>
     <script>
         // Set your Mapbox access token
-        mapboxgl.accessToken = 'pk.eyJ1Ijoia3VsdGthdCIsImEiOiJjbWg2cXd3eDMwazRqMmtzaXMzZTFseXZuIn0.mQ';
+        mapboxgl.accessToken = 'pk.eyJ1Ijoia3VsdGthdCIsImEiOiJjbWg2cXd3eDMwazRqMmtzaXMzZTFseXZuIn0.mQzRbryCl3mMZaEdjT502w';
 
         // Initialize the map
         const map = new mapboxgl.Map({
@@ -29,27 +30,26 @@
             zoom: 5
         });
 
-        // Django passes artworks as JSON
-        const artworks = {{ artworks|safe }};
+        // Parse Django-provided JSON safely
+        const artworks = JSON.parse('{{ artworks|escapejs }}');
 
         // Add markers for each artwork
         artworks.forEach(a => {
-            if(a.latitude && a.longitude){
+            const { latitude, longitude, title } = a.fields; // adjust if your model fields differ
+            if (latitude && longitude) {
                 new mapboxgl.Marker()
-                    .setLngLat([a.longitude, a.latitude])
-                    .setPopup(new mapboxgl.Popup({ offset: 25 })
-                    .setText(a.title))
+                    .setLngLat([longitude, latitude])
+                    .setPopup(new mapboxgl.Popup({ offset: 25 }).setText(title))
                     .addTo(map);
             }
         });
 
-        // Optional: auto-zoom to fit all markers
-        if(artworks.length > 0){
+        // Auto-zoom to fit all markers
+        if (artworks.length > 0) {
             const bounds = new mapboxgl.LngLatBounds();
-            artworks.forEach(a => bounds.extend([a.longitude, a.latitude]));
-            map.fitBounds(bounds, {padding: 50});
+            artworks.forEach(a => bounds.extend([a.fields.longitude, a.fields.latitude]));
+            map.fitBounds(bounds, { padding: 50 });
         }
     </script>
 </body>
 </html>
-
