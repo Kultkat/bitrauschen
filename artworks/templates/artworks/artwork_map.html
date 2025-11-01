@@ -5,42 +5,97 @@
     <title>Bitrauschen – Map View</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Mapbox GL JS CSS (CDN) -->
+    <!-- Mapbox GL JS CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.12.0/mapbox-gl.css" rel="stylesheet">
 
     <style>
         html, body { margin: 0; padding: 0; height: 100%; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+        .text-marker {
+            font-weight: bold;
+            color: #FF0000;
+            font-size: 12px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.8);
+            padding: 2px 4px;
+            border-radius: 3px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .thumbnail {
+            display: none;
+            width: 50px;
+            height: 50px;
+            margin-top: 2px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
 
-    <!-- Mapbox GL JS (CDN) -->
+    <!-- Mapbox GL JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.12.0/mapbox-gl.js"></script>
+
     <script>
-        // Set your Mapbox access token
+        // Mapbox token
         mapboxgl.accessToken = 'pk.eyJ1Ijoia3VsdGthdCIsImEiOiJjbWg2cXd3eDMwazRqMmtzaXMzZTFseXZuIn0.mQzRbryCl3mMZaEdjT502w';
 
         // Initialize the map
         const map = new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/mapbox/light-v11',
-            center: [10, 51], // roughly central Germany
-            zoom: 5
+            center: [10, 51],
+            zoom: 2
         });
 
-        // Parse Django-provided JSON safely
+        // Once style is loaded, make map fully white
+        map.on('style.load', () => {
+            map.getStyle().layers.forEach(layer => {
+                try {
+                    if (layer.type === 'fill') {
+                        map.setPaintProperty(layer.id, 'fill-color', '#FFFFFF'); // land & water white
+                        map.setPaintProperty(layer.id, 'fill-opacity', 1);
+                    } else if (layer.type === 'line' || layer.type === 'symbol') {
+                        map.setLayoutProperty(layer.id, 'visibility', 'none'); // hide borders & labels
+                    }
+                } catch(e) {
+                    console.log('Layer not adjustable:', layer.id);
+                }
+            });
+        });
+
+        // Parse artworks JSON from Django
         const artworks = JSON.parse('{{ artworks|escapejs }}');
 
-        // Add markers for each artwork
+        // Add markers
+        const markers = [];
         artworks.forEach(a => {
-            const { latitude, longitude, title } = a.fields; // adjust if your model fields differ
-            if (latitude && longitude) {
-                new mapboxgl.Marker()
+            const { latitude, longitude, title, thumbnail } = a.fields;
+
+            if(latitude && longitude){
+                // DOM element for text marker
+                const el = document.createElement('div');
+                el.className = 'text-marker';
+                el.innerHTML = title;
+
+                // Optional thumbnail below title
+                if(thumbnail){
+                    const img = document.createElement('img');
+                    img.src = thumbnail; // make sure thumbnail is a valid URL/path
+                    img.className = 'thumbnail';
+                    el.appendChild(img);
+                }
+
+                // Add marker to map
+                const marker = new mapboxgl.Marker(el)
                     .setLngLat([longitude, latitude])
-                    .setPopup(new mapboxgl.Popup({ offset: 25 }).setText(title))
                     .addTo(map);
+
+                markers.push(marker);
             }
         });
 
@@ -50,6 +105,14 @@
             artworks.forEach(a => bounds.extend([a.fields.longitude, a.fields.latitude]));
             map.fitBounds(bounds, { padding: 50 });
         }
+
+        // Show thumbnails on zoom in
+        map.on('zoom', () => {
+            const zoom = map.getZoom();
+            document.querySelectorAll('.thumbnail').forEach(img => {
+                img.style.display = zoom > 5 ? 'block' : 'none';
+            });
+        });
     </script>
 </body>
-</html>
+</html
