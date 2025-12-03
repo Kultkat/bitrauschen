@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bitrauschen – Map View</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Mapbox GL JS CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.12.0/mapbox-gl.css" rel="stylesheet">
+    <!-- Google Fonts: Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; font-family: 'Poppins', sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+        .text-marker {
+            font-weight: 600;
+            color: #333; /* dark gray */
+            font-size: 12px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.9);
+            padding: 3px 6px;
+            border-radius: 4px;
+            text-align: center;
+            white-space: nowrap;
+            box-shadow: 0 0 4px rgba(0,0,0,0.2);
+        }
+
+        .thumbnail {
+            display: none;
+            width: 60px;
+            height: 60px;
+            margin-top: 4px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <!-- Mapbox GL JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.12.0/mapbox-gl.js"></script>
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1Ijoia3VsdGthdCIsImEiOiJjbWg2cXd3eDMwazRqMmtzaXMzZTFseXZuIn0.mQzRbryCl3mMZaEdjT502w';
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [10, 51],
+            zoom: 2
+        });
+
+        map.on('style.load', () => {
+            map.getStyle().layers.forEach(layer => {
+                try {
+                    if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-opacity', 1);
+                    else if (layer.type === 'line' || layer.type === 'symbol') map.setLayoutProperty(layer.id, 'visibility', 'none');
+                } catch(e){ console.log('Layer not adjustable:', layer.id); }
+            });
+        });
+
+        // Fetch projects via AJAX
+        fetch('/artworks/')
+            .then(res => res.json())
+            .then(data => {
+                const projects = data.projects;
+                const markers = [];
+
+                projects.forEach(a => {
+                    if(a.latitude && a.longitude){
+                        const el = document.createElement('div');
+                        el.className = 'text-marker';
+                        el.innerHTML = a.title;
+
+                        if(a.thumbnail){
+                            const img = document.createElement('img');
+                            img.src = a.thumbnail;
+                            img.className = 'thumbnail';
+                            el.appendChild(img);
+                        }
+
+                        let popupHTML = `<strong>${a.title}</strong><br>${a.description || ''}`;
+                        if(a.images){
+                            a.images.forEach(imgUrl => popupHTML += `<br><img src="${imgUrl}" style="width:120px;border-radius:4px;margin-top:4px;">`);
+                        }
+                        if(a.videos){
+                            a.videos.forEach(videoUrl => popupHTML += `<br><video src="${videoUrl}" style="width:150px;margin-top:4px;" controls></video>`);
+                        }
+
+                        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupHTML);
+
+                        const marker = new mapboxgl.Marker(el)
+                            .setLngLat([a.longitude, a.latitude])
+                            .setPopup(popup)
+                            .addTo(map);
+
+                        markers.push(marker);
+                    }
+                });
+
+                if(markers.length > 0){
+                    const bounds = new mapboxgl.LngLatBounds();
+                    markers.forEach(m => bounds.extend(m.getLngLat()));
+                    map.fitBounds(bounds, { padding: 50 });
+                }
+
+                map.on('zoom', () => {
+                    const zoom = map.getZoom();
+                    document.querySelectorAll('.thumbnail').forEach(img => {
+                        img.style.display = zoom > 5 ? 'block' : 'none';
+                    });
+                });
+            });
+    </script>
+</body>
+</html>

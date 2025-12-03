@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitrauschen Artworks Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .artwork-popup { max-width: 300px; }
+        .artwork-popup h3 { margin: 0 0 10px 0; font-size: 16px; color: #333; }
+        .artwork-popup .date { font-size: 12px; color: #666; margin-bottom: 10px; }
+        .artwork-popup .content { font-size: 14px; line-height: 1.4; margin-bottom: 10px; max-height: 100px; overflow-y: auto; }
+        .artwork-popup .images { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
+        .artwork-popup .images img { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; cursor: pointer; transition: transform 0.2s; }
+        .artwork-popup .images img:hover { transform: scale(1.1); }
+        .artwork-popup a { display: inline-block; padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; }
+        .artwork-popup a:hover { background: #0056b3; }
+        .loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; color: #333; z-index: 1000; }
+        .stats { position: absolute; top: 10px; right: 10px; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000; font-size: 14px; }
+        .stats strong { color: #007bff; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="loading">Loading artworks...</div>
+    <div class="stats" style="display:none;"><strong id="artwork-count">0</strong> artworks</div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([50.85, 6.0], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        const artworkIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        });
+        
+        fetch('/api/artworks.geojson')
+            .then(response => response.json())
+            .then(data => {
+                document.querySelector('.loading').style.display = 'none';
+                document.querySelector('.stats').style.display = 'block';
+                document.getElementById('artwork-count').textContent = data.features.length;
+                
+                L.geoJSON(data, {
+                    pointToLayer: (feature, latlng) => L.marker(latlng, { icon: artworkIcon }),
+                    onEachFeature: (feature, layer) => {
+                        const props = feature.properties;
+                        let popupContent = `<div class="artwork-popup">
+                            <h3>${props.title || 'Untitled'}</h3>
+                            <div class="date">${new Date(props.created).toLocaleDateString()}</div>`;
+                        
+                        if (props.images && props.images.length > 0) {
+                            popupContent += '<div class="images">';
+                            props.images.forEach(img => {
+                                popupContent += `<img src="${img}" alt="${props.title}" 
+                                    onerror="this.style.display='none'"
+                                    onclick="window.open('${img}', '_blank')">`;
+                            });
+                            popupContent += '</div>';
+                        }
+                        
+                        if (props.content) {
+                            const preview = props.content.substring(0, 150) + (props.content.length > 150 ? '...' : '');
+                            popupContent += `<div class="content">${preview}</div>`;
+                        }
+                        
+                        if (props.link) popupContent += `<a href="${props.link}" target="_blank">More Info</a>`;
+                        popupContent += '</div>';
+                        
+                        layer.bindPopup(popupContent, { maxWidth: 300 });
+                    }
+                }).addTo(map);
+            })
+            .catch(error => {
+                console.error('Error loading artworks:', error);
+                document.querySelector('.loading').textContent = 'Error loading artworks';
+            });
+    </script>
+</body>
+</html>
